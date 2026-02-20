@@ -68,7 +68,11 @@
         }
       ]
     },
+    "portable": {
+      "artifactName": "StreamFetch-Portable-${version}.${ext}"
+    },
     "nsis": {
+      "artifactName": "StreamFetch-Setup-${version}.${ext}",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
