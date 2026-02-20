@@ -34,14 +34,22 @@ jobs:
         shell: pwsh
         env:
           YTDLP_VERSION: '2025.01.15'
-          YTDLP_SHA256: 'b6fbe32ef99e16fed028d4db7bc5e25b50e9c9b01c2fe47da1bfd8e63e99e424'
         run: |
           New-Item -ItemType Directory -Force -Path bin | Out-Null
-          $url = "https://github.com/yt-dlp/yt-dlp/releases/download/$env:YTDLP_VERSION/yt-dlp.exe"
-          Invoke-WebRequest -Uri $url -OutFile "bin/yt-dlp.exe"
-          $hash = (Get-FileHash -Algorithm SHA256 "bin/yt-dlp.exe").Hash
-          if ($hash -ne $env:YTDLP_SHA256.ToUpper()) {
-            Write-Error "SHA-256 mismatch for yt-dlp.exe: expected $($env:YTDLP_SHA256.ToUpper()), got $hash"
+          $baseUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/$env:YTDLP_VERSION"
+          Invoke-WebRequest -Uri "$baseUrl/yt-dlp.exe" -OutFile "bin/yt-dlp.exe"
+          Invoke-WebRequest -Uri "$baseUrl/SHA2-256SUMS" -OutFile "bin/SHA2-256SUMS"
+
+          $checksumLine = Select-String -Path "bin/SHA2-256SUMS" -Pattern '^([a-fA-F0-9]{64})\s+\*?yt-dlp\.exe$' | Select-Object -First 1
+          if (-not $checksumLine) {
+            Write-Error "Could not find checksum for yt-dlp.exe in SHA2-256SUMS"
+            exit 1
+          }
+
+          $expectedHash = $checksumLine.Matches[0].Groups[1].Value.ToUpper()
+          $actualHash = (Get-FileHash -Algorithm SHA256 "bin/yt-dlp.exe").Hash
+          if ($actualHash -ne $expectedHash) {
+            Write-Error "SHA-256 mismatch for yt-dlp.exe: expected $expectedHash, got $actualHash"
             exit 1
           }
 
