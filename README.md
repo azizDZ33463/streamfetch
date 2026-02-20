@@ -82,6 +82,11 @@ Install from GitHub Releases to avoid manual setup. Each release includes:
 - Windows installer (`Setup .exe`)
 - Portable executable (`.exe`)
 
+## Screenshots
+
+![StreamFetch Screenshot 1](Screenshots/Pic1%20(1).png)
+![StreamFetch Screenshot 2](Screenshots/Pic1%20(2).png)
+
 ## License
 
 MIT
