@@ -350,7 +350,7 @@ function App() {
 
         <main className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 xl:grid-cols-[1.28fr_1fr]">
           <Card className="min-h-0 overflow-hidden p-4 md:p-5">
-            <div className="grid h-full min-h-0 content-start gap-4 overflow-y-auto pr-1 [scrollbar-color:#CBD5E1_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/70">
+            <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pr-1 [scrollbar-color:#CBD5E1_transparent] [scrollbar-width:thin] [&>*]:shrink-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/70">
               {!hasElectron && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   Electron bridge unavailable. Run inside desktop app.

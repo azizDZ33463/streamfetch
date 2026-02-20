@@ -2,7 +2,7 @@ import Card from "./ui/Card";
 
 function VideoInfoSkeleton() {
   return (
-    <Card as="section" className="animate-pulse p-3">
+    <Card as="section" className="animate-pulse p-3 min-h-[184px]">
       <div className="grid gap-4 md:grid-cols-[220px_1fr]">
         <div className="h-36 rounded-2xl bg-app-panel md:h-40" />
         <div className="space-y-3 py-2">
