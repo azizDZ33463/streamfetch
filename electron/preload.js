@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setGlobalSpeedLimit: (value) => ipcRenderer.invoke("settings:set-global-speed-limit", value),
   checkYtDlpUpdate: () => ipcRenderer.invoke("ytdlp:check-update"),
   updateYtDlp: () => ipcRenderer.invoke("ytdlp:update"),
+  openExternal: (url) => ipcRenderer.invoke("app:open-external", url),
   windowMinimize: () => ipcRenderer.invoke("window:minimize"),
   windowToggleMaximize: () => ipcRenderer.invoke("window:toggle-maximize"),
   windowClose: () => ipcRenderer.invoke("window:close"),

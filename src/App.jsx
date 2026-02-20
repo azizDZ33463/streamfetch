@@ -10,6 +10,7 @@ import Card from "./components/ui/Card";
 import Input from "./components/ui/Input";
 
 const QUALITY_OPTIONS = ["best", "1080p", "720p", "480p", "240p", "144p"];
+const PROJECT_REPO_URL = "https://github.com/Shripad735/streamfetch";
 
 function formatDuration(totalSeconds) {
   if (!totalSeconds || Number.isNaN(totalSeconds)) return "Unknown";
@@ -290,6 +291,14 @@ function App() {
     await window.electronAPI.clearFinished();
   };
 
+  const handleOpenRepo = async () => {
+    if (hasElectron && window.electronAPI?.openExternal) {
+      await window.electronAPI.openExternal(PROJECT_REPO_URL);
+      return;
+    }
+    window.open(PROJECT_REPO_URL, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div className="h-screen bg-app-bg p-3 md:p-4">
       <div className="mx-auto flex h-full max-w-[1600px] flex-col overflow-hidden rounded-3xl border border-app-border bg-app-bg">
@@ -303,6 +312,17 @@ function App() {
           </div>
 
           <div className="flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" }}>
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-app-border bg-white text-app-muted transition-colors duration-200 hover:border-app-accent/40 hover:text-app-accent"
+              onClick={handleOpenRepo}
+              title="Open source on GitHub"
+              aria-label="Open StreamFetch GitHub repository"
+            >
+              <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.22 2.2.82a7.5 7.5 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+              </svg>
+            </button>
             <button
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-app-border bg-white text-xs text-app-muted transition-colors duration-200 hover:border-app-accent/40 hover:text-app-accent"
               onClick={() => hasElectron && window.electronAPI.windowMinimize()}
@@ -330,7 +350,7 @@ function App() {
 
         <main className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 xl:grid-cols-[1.28fr_1fr]">
           <Card className="min-h-0 overflow-hidden p-4 md:p-5">
-            <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pr-1 [scrollbar-color:#CBD5E1_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/70">
+            <div className="grid h-full min-h-0 content-start gap-4 overflow-y-auto pr-1 [scrollbar-color:#CBD5E1_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/70">
               {!hasElectron && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   Electron bridge unavailable. Run inside desktop app.

@@ -23,7 +23,7 @@ if (typeof electron === "string") {
   process.exit(result.status ?? 0);
 }
 
-const { app, BrowserWindow, dialog, ipcMain, Notification } = electron;
+const { app, BrowserWindow, dialog, ipcMain, Notification, shell } = electron;
 
 const QUALITY_OPTIONS = new Set(["best", "1080p", "720p", "480p", "240p", "144p"]);
 const QUALITY_HEIGHT = {
@@ -857,6 +857,15 @@ ipcMain.handle("window:close", () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.close();
   }
+});
+ipcMain.handle("app:open-external", async (_event, url) => {
+  const normalizedUrl = String(url || "").trim();
+  if (!isValidHttpUrl(normalizedUrl)) {
+    return { success: false, message: "Invalid URL." };
+  }
+
+  await shell.openExternal(normalizedUrl);
+  return { success: true };
 });
 
 ipcMain.handle("dialog:select-folder", async () => {
