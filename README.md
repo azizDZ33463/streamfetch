@@ -1,27 +1,38 @@
 # StreamFetch
 
-Fast Windows desktop downloader for YouTube and other platforms, powered by Electron, React, and `yt-dlp`.
+Fast Windows desktop downloader for YouTube and other platforms, built with Electron + React and powered by `yt-dlp`.
 
 ## Screenshots
 
 ![StreamFetch Screenshot 1](Screenshots/Pic1%20(1).png)
 ![StreamFetch Screenshot 2](Screenshots/Pic1%20(2).png)
 
-## Why StreamFetch
+## Highlights
 
-StreamFetch focuses on reliability over flashy one-off downloads:
-- Queue-based downloads with live per-item progress
+- Queue-based downloads with per-item progress and logs
 - Pause, resume, cancel, and retry controls
-- Smart fallback logic when a selected format fails
-- Built-in `yt-dlp` updater from inside the app
-- Optional FFmpeg merging for best quality output
+- Smart fallback strategy for format/download failures
+- Built-in `yt-dlp` updater
+- In-app app-update notification (checks GitHub latest release)
+- Conditional auth handling for age/bot-restricted content
+- Clear centered popup when no downloadable formats are available
 
-## Key Features
+## Restricted/Age Content Handling
 
-- URL parsing for single videos and playlists
+StreamFetch now handles restricted content in a guided flow:
+
+1. Try normal fetch/download first.
+2. If authentication is required, a popup appears (browser cookies).
+3. If browser cookie access fails (DPAPI/locked DB), popup enables `cookies.txt` import.
+4. Retry can be applied both at fetch-time and download-time.
+5. If video still has no downloadable streams, StreamFetch shows a dedicated "No Downloadable Formats" popup.
+
+## Features
+
+- Single video and playlist support
 - Advanced format picker from extracted format IDs
 - Playlist range controls (`start`, `end`, include, exclude)
-- Per-download and global speed limits (`500K`, `2M`, `1.5M`)
+- Global + per-download speed limits (`500K`, `2M`, `1.5M`)
 - Download history and runtime logs
 - Frameless desktop UI with custom window controls
 
@@ -39,7 +50,7 @@ streamfetch/
   electron/        # Main process + preload bridge
   src/             # React renderer
   bin/             # yt-dlp.exe and optional ffmpeg.exe
-  release/         # Build outputs (ignored in git)
+  release/         # Build outputs
 ```
 
 ## Quick Start (Development)
@@ -62,9 +73,21 @@ npm start
 npm run build:win
 ```
 
-Artifacts are created in `release/`:
-- `StreamFetch Setup 1.0.0.exe` (installer)
-- `StreamFetch 1.0.0.exe` (portable)
+Artifacts are created in `release/` using these patterns:
+- `StreamFetch-Setup-<version>.exe` (installer)
+- `StreamFetch-Portable-<version>.exe` (portable)
+
+## Release Workflow
+
+- GitHub workflow runs on `v*` tags (for example `v1.0.10`).
+- Release notes are auto-generated from commits between the previous release tag and the current tag.
+- Notes are grouped into `Features`, `Fixes`, and `Other Changes` based on commit message prefix.
+
+Use these commit prefixes to classify notes:
+
+- `feat: add app update notification banner`
+- `fix: handle age-restricted download retry`
+- `hotfix: prevent renderer crash on startup`
 
 ## Security Model
 
@@ -79,7 +102,7 @@ For source-based development, place these files in `bin/`:
 - `yt-dlp.exe` (required)
 - `ffmpeg.exe` (optional, enables merged best-quality outputs)
 
-These binaries are not committed to git to keep the repository lightweight.
+These binaries are not committed to git to keep repository size small.
 
 ## Releases
 
