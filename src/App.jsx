@@ -55,10 +55,18 @@ function App() {
     url: "",
     supportedBrowsers: COOKIE_BROWSER_OPTIONS.map((item) => item.value),
     detail: "",
-    canUseCookiesFile: false
+    canUseCookiesFile: false,
+    source: "fetch",
+    jobId: ""
   });
   const [cookieRetrying, setCookieRetrying] = useState(false);
   const [cookieFileRetrying, setCookieFileRetrying] = useState(false);
+  const [noFormatsPrompt, setNoFormatsPrompt] = useState({
+    open: false,
+    title: "No Downloadable Formats",
+    message: "",
+    detail: ""
+  });
 
   const [mode, setMode] = useState("video");
   const [quality, setQuality] = useState("best");
@@ -99,6 +107,18 @@ function App() {
         return updater({ ...job });
       })
     );
+  }, []);
+
+  const showNoFormatsPrompt = useCallback((message, detail = "") => {
+    setNoFormatsPrompt({
+      open: true,
+      title: "No Downloadable Formats",
+      message: String(message || "This video currently has no downloadable stream formats."),
+      detail: String(detail || "").trim()
+    });
+  }, []);
+  const closeNoFormatsPrompt = useCallback(() => {
+    setNoFormatsPrompt((prev) => ({ ...prev, open: false }));
   }, []);
 
   useEffect(() => {
@@ -158,6 +178,45 @@ function App() {
       }),
       window.electronAPI.onDownloadError((payload) => {
         patchJob(payload.jobId, (job) => ({ ...job, status: "failed", lastError: payload.message || "" }));
+        const isAuthIssue = ["cookies_required", "browser_cookies_failed", "cookies_auth_failed"].includes(
+          String(payload?.reason || "")
+        );
+        if (isAuthIssue) {
+          const supportedBrowsers =
+            Array.isArray(payload.supportedBrowsers) && payload.supportedBrowsers.length > 0
+              ? payload.supportedBrowsers
+              : COOKIE_BROWSER_OPTIONS.map((item) => item.value);
+          setCookieBrowser((prev) => (supportedBrowsers.includes(prev) ? prev : supportedBrowsers[0]));
+          setCookiePrompt({
+            open: true,
+            message:
+              payload.promptMessage ||
+              "This download needs authentication. Choose a browser or cookies.txt file, then retry.",
+            url: String(payload.url || "").trim(),
+            supportedBrowsers,
+            detail: payload.detail || payload.message || "",
+            canUseCookiesFile: Boolean(payload.canUseCookiesFile),
+            source: "download",
+            jobId: String(payload.jobId || "")
+          });
+          setSelectedJobId(String(payload.jobId || ""));
+          pushToast({
+            type: "warn",
+            title: "Authentication Needed",
+            message: "Apply cookies and retry this failed download."
+          });
+          return;
+        }
+
+        if (String(payload?.reason || "") === "no_formats_available") {
+          setErrorMessage(
+            "No downloadable formats are available for this video with current access. It may be DRM-protected or unavailable."
+          );
+          showNoFormatsPrompt(
+            "This video currently has no downloadable stream formats.\nIt may be DRM-protected or temporarily unavailable.",
+            payload?.detail || payload?.message || ""
+          );
+        }
       }),
       window.electronAPI.onToast((payload) => {
         pushToast({
@@ -169,7 +228,7 @@ function App() {
     ];
 
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [hasElectron, patchJob, pushToast]);
+  }, [hasElectron, patchJob, pushToast, showNoFormatsPrompt]);
 
   useEffect(() => {
     const currentExists = jobs.some((item) => item.id === selectedJobId);
@@ -227,6 +286,7 @@ function App() {
     setErrorMessage("");
     setFetchingInfo(true);
     setVideoInfo(null);
+    closeNoFormatsPrompt();
     setActiveCookieBrowser("");
     setActiveCookiesFile("");
     setCookiesFilePath("");
@@ -246,7 +306,9 @@ function App() {
           url: url.trim(),
           supportedBrowsers,
           detail: "",
-          canUseCookiesFile: false
+          canUseCookiesFile: false,
+          source: "fetch",
+          jobId: ""
         });
         pushToast({
           type: "warn",
@@ -267,11 +329,9 @@ function App() {
       setActiveCookiesFile("");
       if (!Array.isArray(info.formats) || info.formats.length === 0) {
         setErrorMessage("No downloadable formats were returned for this video. It may be DRM-protected or unavailable.");
-        pushToast({
-          type: "warn",
-          title: "No Formats Found",
-          message: "This video may be DRM-protected or currently unavailable for direct download."
-        });
+        showNoFormatsPrompt(
+          "No downloadable formats were returned for this video.\nIt may be DRM-protected or currently unavailable for direct download."
+        );
       }
       pushToast({ type: "info", title: "Metadata Loaded", message: `Fetched ${info.title}` });
     } catch (error) {
@@ -283,7 +343,44 @@ function App() {
   };
 
   const handleRetryFetchWithCookies = async () => {
-    if (!hasElectron || !cookiePrompt.open || !cookiePrompt.url) return;
+    if (!hasElectron || !cookiePrompt.open) return;
+    const isDownloadRetry = cookiePrompt.source === "download" && cookiePrompt.jobId;
+
+    if (isDownloadRetry) {
+      setCookieRetrying(true);
+      setErrorMessage("");
+      try {
+        const response = await window.electronAPI.resumeDownload({
+          jobId: cookiePrompt.jobId,
+          cookieBrowser
+        });
+        if (!response?.success) {
+          throw new Error(response?.message || "Unable to retry download with browser cookies.");
+        }
+        setActiveCookieBrowser(cookieBrowser);
+        setActiveCookiesFile("");
+        setCookiesFilePath("");
+        setCookiePrompt((prev) => ({ ...prev, open: false, jobId: "", source: "fetch" }));
+        setSelectedJobId(cookiePrompt.jobId);
+        pushToast({
+          type: "success",
+          title: "Retry Queued",
+          message: `Retrying download with ${getBrowserLabel(cookieBrowser)} cookies.`
+        });
+      } catch (error) {
+        setErrorMessage(error.message || "Unable to retry download with browser cookies.");
+        pushToast({
+          type: "error",
+          title: "Cookie Retry Failed",
+          message: error.message || "Unable to retry download with browser cookies."
+        });
+      } finally {
+        setCookieRetrying(false);
+      }
+      return;
+    }
+
+    if (!cookiePrompt.url) return;
     setCookieRetrying(true);
     setFetchingInfo(true);
     setErrorMessage("");
@@ -317,14 +414,12 @@ function App() {
       setActiveCookieBrowser(cookieBrowser);
       setActiveCookiesFile("");
       setCookiesFilePath("");
-      setCookiePrompt((prev) => ({ ...prev, open: false }));
+      setCookiePrompt((prev) => ({ ...prev, open: false, source: "fetch", jobId: "" }));
       if (!Array.isArray(info.formats) || info.formats.length === 0) {
         setErrorMessage("No downloadable formats were returned for this video. It may be DRM-protected or unavailable.");
-        pushToast({
-          type: "warn",
-          title: "No Formats Found",
-          message: "This video may be DRM-protected or currently unavailable for direct download."
-        });
+        showNoFormatsPrompt(
+          "No downloadable formats were returned for this video.\nIt may be DRM-protected or currently unavailable for direct download."
+        );
       }
       pushToast({
         type: "success",
@@ -353,12 +448,47 @@ function App() {
   };
 
   const handleRetryFetchWithCookiesFile = async () => {
-    if (!hasElectron || !cookiePrompt.open || !cookiePrompt.url) return;
+    if (!hasElectron || !cookiePrompt.open) return;
     if (!cookiesFilePath) {
       setErrorMessage("Select a cookies.txt file first.");
       return;
     }
 
+    const isDownloadRetry = cookiePrompt.source === "download" && cookiePrompt.jobId;
+    if (isDownloadRetry) {
+      setCookieFileRetrying(true);
+      setErrorMessage("");
+      try {
+        const response = await window.electronAPI.resumeDownload({
+          jobId: cookiePrompt.jobId,
+          cookiesFile: cookiesFilePath
+        });
+        if (!response?.success) {
+          throw new Error(response?.message || "Unable to retry download with cookies file.");
+        }
+        setActiveCookiesFile(cookiesFilePath);
+        setActiveCookieBrowser("");
+        setCookiePrompt((prev) => ({ ...prev, open: false, jobId: "", source: "fetch" }));
+        setSelectedJobId(cookiePrompt.jobId);
+        pushToast({
+          type: "success",
+          title: "Retry Queued",
+          message: `Retrying download with ${getFileName(cookiesFilePath)}.`
+        });
+      } catch (error) {
+        setErrorMessage(error.message || "Unable to retry download with cookies file.");
+        pushToast({
+          type: "error",
+          title: "Cookies File Retry Failed",
+          message: error.message || "Unable to retry download with cookies file."
+        });
+      } finally {
+        setCookieFileRetrying(false);
+      }
+      return;
+    }
+
+    if (!cookiePrompt.url) return;
     setCookieFileRetrying(true);
     setFetchingInfo(true);
     setErrorMessage("");
@@ -377,14 +507,12 @@ function App() {
       setSelectedFormatId("auto");
       setActiveCookiesFile(cookiesFilePath);
       setActiveCookieBrowser("");
-      setCookiePrompt((prev) => ({ ...prev, open: false }));
+      setCookiePrompt((prev) => ({ ...prev, open: false, source: "fetch", jobId: "" }));
       if (!Array.isArray(info.formats) || info.formats.length === 0) {
         setErrorMessage("No downloadable formats were returned for this video. It may be DRM-protected or unavailable.");
-        pushToast({
-          type: "warn",
-          title: "No Formats Found",
-          message: "This video may be DRM-protected or currently unavailable for direct download."
-        });
+        showNoFormatsPrompt(
+          "No downloadable formats were returned for this video.\nIt may be DRM-protected or currently unavailable for direct download."
+        );
       }
       pushToast({
         type: "success",
@@ -758,6 +886,28 @@ function App() {
         </main>
       </div>
 
+      {noFormatsPrompt.open && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4">
+          <Card className="w-full max-w-lg p-5">
+            <h3 className="font-display text-base font-semibold text-app-text">{noFormatsPrompt.title}</h3>
+            <p className="mt-2 whitespace-pre-line text-sm text-app-muted">{noFormatsPrompt.message}</p>
+            <p className="mt-2 text-xs text-app-muted">
+              This is usually caused by restricted/DRM streams and not by a normal app error.
+            </p>
+            {noFormatsPrompt.detail && (
+              <pre className="mt-3 max-h-32 overflow-auto rounded-2xl border border-app-border bg-app-panel p-3 text-xs text-app-muted [scrollbar-color:#CBD5E1_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/70">
+                {noFormatsPrompt.detail}
+              </pre>
+            )}
+            <div className="mt-4 flex justify-end">
+              <Button variant="primary" onClick={closeNoFormatsPrompt}>
+                OK
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {cookiePrompt.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
           <Card className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden p-5">
@@ -846,7 +996,7 @@ function App() {
               <Button
                 variant="ghost"
                 onClick={() => {
-                  setCookiePrompt((prev) => ({ ...prev, open: false }));
+                  setCookiePrompt((prev) => ({ ...prev, open: false, source: "fetch", jobId: "" }));
                   setActiveCookieBrowser("");
                   setActiveCookiesFile("");
                   setCookiesFilePath("");

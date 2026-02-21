@@ -168,6 +168,8 @@ function needsBrowserCookies(stderrText) {
   const message = String(stderrText || "").toLowerCase();
   if (!message) return false;
   return (
+    message.includes("sign in to confirm your age") ||
+    message.includes("this video may be inappropriate for some users") ||
     message.includes("sign in to confirm you're not a bot") ||
     message.includes("use --cookies-from-browser or --cookies for the authentication")
   );
@@ -182,6 +184,12 @@ function isBrowserCookieAccessError(stderrText) {
     message.includes("database is locked") ||
     message.includes("failed to decrypt")
   );
+}
+
+function isRequestedFormatUnavailable(stderrText) {
+  const message = String(stderrText || "").toLowerCase();
+  if (!message) return false;
+  return message.includes("requested format is not available");
 }
 
 function normalizeRateLimit(input) {
@@ -797,6 +805,79 @@ function startJob(job) {
     }
 
     const stderr = (entry?.stderrBuffer || "").trim();
+    const authError = needsBrowserCookies(stderr);
+    const browserAccessError = Boolean(job.cookieBrowser) && isBrowserCookieAccessError(stderr);
+
+    if (authError || browserAccessError) {
+      let reason = "cookies_required";
+      let promptMessage =
+        "This video needs authentication. Choose a browser or cookies.txt file, then retry.";
+      let canUseCookiesFile = true;
+
+      if (!job.cookieBrowser && !job.cookiesFile) {
+        reason = "cookies_required";
+        promptMessage =
+          "This video needs authentication for age/bot checks. Choose a browser or cookies.txt file, then retry.";
+      } else if (browserAccessError) {
+        reason = "browser_cookies_failed";
+        const browserName = job.cookieBrowser.charAt(0).toUpperCase() + job.cookieBrowser.slice(1);
+        promptMessage = `Could not read ${browserName} cookies on this system. Use cookies.txt and retry.`;
+      } else if (job.cookiesFile || job.cookieBrowser) {
+        reason = "cookies_auth_failed";
+        promptMessage =
+          "The selected cookies did not grant access to this video. Export fresh YouTube cookies and retry.";
+      }
+
+      const finalMessage = stderr || "Download failed due to authentication.";
+      setJobStatus(job, JOB_STATUS.FAILED, finalMessage);
+      sendToRenderer("video:download-error", {
+        jobId: job.id,
+        url: job.url,
+        message: finalMessage,
+        reason,
+        promptMessage,
+        detail: stderr || "",
+        supportedBrowsers: DEFAULT_COOKIE_BROWSERS,
+        canUseCookiesFile
+      });
+      pushToast({
+        type: "error",
+        title: "Authentication Needed",
+        message: `${job.title || "Item"} requires cookies to continue.`,
+        jobId: job.id
+      });
+      sendJobsSnapshot();
+      schedulePersist();
+      startNextQueuedJob();
+      return;
+    }
+
+    if (isRequestedFormatUnavailable(stderr)) {
+      const friendly =
+        "No downloadable streams were returned for this video with the current cookies/settings. The video may be DRM-protected or temporarily unavailable.";
+      const finalMessage = stderr
+        ? `${friendly}\n\n${stderr}`
+        : friendly;
+      setJobStatus(job, JOB_STATUS.FAILED, finalMessage);
+      sendToRenderer("video:download-error", {
+        jobId: job.id,
+        url: job.url,
+        message: finalMessage,
+        reason: "no_formats_available",
+        detail: stderr || ""
+      });
+      pushToast({
+        type: "error",
+        title: "No Downloadable Formats",
+        message: `${job.title || "Item"} has no downloadable stream formats.`,
+        jobId: job.id
+      });
+      sendJobsSnapshot();
+      schedulePersist();
+      startNextQueuedJob();
+      return;
+    }
+
     const hasFallback = job.strategyIndex < strategies.length - 1;
     if (hasFallback) {
       job.strategyIndex += 1;
@@ -1150,13 +1231,26 @@ ipcMain.handle("video:pause-download", async (_event, jobId) => {
   return { success: false, message: "Only queued or active downloads can be paused." };
 });
 
-ipcMain.handle("video:resume-download", async (_event, jobId) => {
-  const id = String(jobId || "");
+ipcMain.handle("video:resume-download", async (_event, payload) => {
+  const request = typeof payload === "string" ? { jobId: payload } : payload || {};
+  const id = String(request.jobId || "");
   const job = jobsById.get(id);
   if (!job) return { success: false, message: "Download job not found." };
 
   if (![JOB_STATUS.PAUSED, JOB_STATUS.FAILED, JOB_STATUS.CANCELED].includes(job.status)) {
     return { success: false, message: "Only paused/failed/canceled items can be resumed." };
+  }
+
+  const cookiesFile = normalizeCookiesFile(request.cookiesFile);
+  const cookieBrowser = cookiesFile ? "" : normalizeCookieBrowser(request.cookieBrowser);
+  if (cookiesFile || cookieBrowser) {
+    job.cookiesFile = cookiesFile;
+    job.cookieBrowser = cookieBrowser;
+    if (cookiesFile) {
+      appendJobLog(job, "Authentication: using selected cookies file.");
+    } else {
+      appendJobLog(job, `Authentication: using ${cookieBrowser} browser cookies.`);
+    }
   }
 
   job.status = JOB_STATUS.QUEUED;
