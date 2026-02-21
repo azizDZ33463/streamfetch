@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   cancelDownload: (jobId) => ipcRenderer.invoke("video:cancel-download", jobId),
   clearFinished: () => ipcRenderer.invoke("video:clear-finished"),
   setGlobalSpeedLimit: (value) => ipcRenderer.invoke("settings:set-global-speed-limit", value),
+  checkAppUpdate: () => ipcRenderer.invoke("app:check-update"),
   checkYtDlpUpdate: () => ipcRenderer.invoke("ytdlp:check-update"),
   updateYtDlp: () => ipcRenderer.invoke("ytdlp:update"),
   openExternal: (url) => ipcRenderer.invoke("app:open-external", url),

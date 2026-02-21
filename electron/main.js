@@ -28,6 +28,7 @@ const { app, BrowserWindow, dialog, ipcMain, Notification, shell } = electron;
 const QUALITY_OPTIONS = new Set(["best", "1080p", "720p", "480p", "240p", "144p"]);
 const COOKIE_BROWSERS = new Set(["chrome", "edge", "firefox", "brave"]);
 const DEFAULT_COOKIE_BROWSERS = ["chrome", "edge", "firefox", "brave"];
+const APP_RELEASES_API_URL = "https://api.github.com/repos/Shripad735/streamfetch/releases/latest";
 const QUALITY_HEIGHT = {
   best: null,
   "1080p": 1080,
@@ -939,6 +940,80 @@ function runYtDlpCommand(args, { timeoutMs = 120000 } = {}) {
   });
 }
 
+function normalizeVersionTag(value) {
+  return String(value || "").trim().replace(/^v/i, "");
+}
+
+function parseVersionParts(value) {
+  const normalized = normalizeVersionTag(value);
+  if (!normalized) return [];
+  const core = normalized.split("-")[0];
+  if (!core) return [];
+  return core.split(".").map((part) => {
+    const match = String(part).match(/^(\d+)/);
+    return match ? Number(match[1]) : 0;
+  });
+}
+
+function compareSemverLike(left, right) {
+  const a = parseVersionParts(left);
+  const b = parseVersionParts(right);
+  const max = Math.max(a.length, b.length);
+  for (let idx = 0; idx < max; idx += 1) {
+    const aPart = Number(a[idx] || 0);
+    const bPart = Number(b[idx] || 0);
+    if (aPart > bPart) return 1;
+    if (aPart < bPart) return -1;
+  }
+  return 0;
+}
+
+function fetchLatestAppRelease() {
+  return new Promise((resolve, reject) => {
+    const request = https.request(
+      APP_RELEASES_API_URL,
+      {
+        method: "GET",
+        headers: {
+          "User-Agent": "StreamFetch",
+          Accept: "application/vnd.github+json"
+        },
+        timeout: 15000
+      },
+      (response) => {
+        let body = "";
+        response.on("data", (chunk) => {
+          body += chunk.toString();
+        });
+        response.on("end", () => {
+          if (response.statusCode !== 200) {
+            reject(new Error(`GitHub API returned ${response.statusCode}.`));
+            return;
+          }
+
+          try {
+            const parsed = JSON.parse(body);
+            resolve({
+              tagName: String(parsed.tag_name || "").trim(),
+              url: String(parsed.html_url || "").trim(),
+              name: String(parsed.name || "").trim(),
+              publishedAt: String(parsed.published_at || "").trim()
+            });
+          } catch {
+            reject(new Error("Failed to parse latest app release response."));
+          }
+        });
+      }
+    );
+
+    request.on("error", (error) => reject(error));
+    request.on("timeout", () => {
+      request.destroy(new Error("App update check timed out."));
+    });
+    request.end();
+  });
+}
+
 function fetchLatestYtDlpVersion() {
   return new Promise((resolve, reject) => {
     const request = https.request(
@@ -1009,6 +1084,30 @@ ipcMain.handle("app:open-external", async (_event, url) => {
 
   await shell.openExternal(normalizedUrl);
   return { success: true };
+});
+ipcMain.handle("app:check-update", async () => {
+  const currentVersion = String(app.getVersion() || "").trim();
+  const latest = await fetchLatestAppRelease();
+  const latestTag = String(latest.tagName || "").trim();
+  const latestVersion = normalizeVersionTag(latestTag);
+  const normalizedCurrent = normalizeVersionTag(currentVersion);
+
+  let updateAvailable = false;
+  if (latestVersion && normalizedCurrent) {
+    updateAvailable = compareSemverLike(latestVersion, normalizedCurrent) > 0;
+  } else if (latestVersion) {
+    updateAvailable = latestVersion !== normalizedCurrent;
+  }
+
+  return {
+    currentVersion: normalizedCurrent || currentVersion,
+    latestVersion,
+    latestTag,
+    releaseUrl: latest.url || "https://github.com/Shripad735/streamfetch/releases/latest",
+    releaseName: latest.name || latestTag || "",
+    publishedAt: latest.publishedAt || "",
+    updateAvailable
+  };
 });
 
 ipcMain.handle("dialog:select-folder", async () => {

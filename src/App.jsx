@@ -88,6 +88,17 @@ function App() {
     updateAvailable: false,
     output: ""
   });
+  const [appUpdateState, setAppUpdateState] = useState({
+    checking: false,
+    checked: false,
+    currentVersion: "",
+    latestVersion: "",
+    latestTag: "",
+    releaseUrl: "",
+    updateAvailable: false,
+    dismissed: false,
+    error: ""
+  });
 
   const pushToast = useCallback((input) => {
     const toast = {
@@ -121,6 +132,49 @@ function App() {
     setNoFormatsPrompt((prev) => ({ ...prev, open: false }));
   }, []);
 
+  const checkAppUpdate = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!hasElectron || !window.electronAPI?.checkAppUpdate) return;
+      setAppUpdateState((prev) => ({
+        ...prev,
+        checking: true,
+        error: silent ? prev.error : ""
+      }));
+      try {
+        const response = await window.electronAPI.checkAppUpdate();
+        setAppUpdateState((prev) => ({
+          ...prev,
+          checking: false,
+          checked: true,
+          currentVersion: String(response.currentVersion || ""),
+          latestVersion: String(response.latestVersion || ""),
+          latestTag: String(response.latestTag || ""),
+          releaseUrl: String(response.releaseUrl || ""),
+          updateAvailable: Boolean(response.updateAvailable),
+          dismissed: Boolean(response.updateAvailable) ? prev.dismissed : false,
+          error: ""
+        }));
+      } catch (error) {
+        setAppUpdateState((prev) => ({
+          ...prev,
+          checking: false,
+          checked: true,
+          error: error.message || "App update check failed."
+        }));
+      }
+    },
+    [hasElectron]
+  );
+
+  const handleOpenAppUpdate = useCallback(async () => {
+    const target = appUpdateState.releaseUrl || "https://github.com/Shripad735/streamfetch/releases/latest";
+    if (hasElectron && window.electronAPI?.openExternal) {
+      await window.electronAPI.openExternal(target);
+      return;
+    }
+    window.open(target, "_blank", "noopener,noreferrer");
+  }, [appUpdateState.releaseUrl, hasElectron]);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setToasts((prev) => prev.filter((toast) => toast.expiresAt > Date.now()));
@@ -139,6 +193,21 @@ function App() {
     document.documentElement.setAttribute("data-theme", theme);
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    let disposed = false;
+    if (!hasElectron || !window.electronAPI?.checkAppUpdate) return () => {};
+
+    const run = async () => {
+      await checkAppUpdate({ silent: true });
+      if (disposed) return;
+    };
+    run();
+
+    return () => {
+      disposed = true;
+    };
+  }, [checkAppUpdate, hasElectron]);
 
   useEffect(() => {
     if (!hasElectron) return undefined;
@@ -730,6 +799,34 @@ function App() {
                 <div className="rounded-2xl border border-app-dangerBorder bg-app-dangerBg px-4 py-3 text-sm text-app-dangerText">
                   Electron bridge unavailable. Run inside desktop app.
                 </div>
+              )}
+
+              {hasElectron && appUpdateState.updateAvailable && !appUpdateState.dismissed && (
+                <Card className="border-app-accent/25 bg-app-panel p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="font-display text-sm font-semibold text-app-text">
+                        App Update Available ({appUpdateState.latestTag || appUpdateState.latestVersion || "latest"})
+                      </h3>
+                      <p className="mt-1 text-xs text-app-muted">
+                        Installed: {appUpdateState.currentVersion || "--"} | Latest:{" "}
+                        {appUpdateState.latestVersion || appUpdateState.latestTag || "--"}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="secondary" onClick={handleOpenAppUpdate}>
+                        Download Update
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setAppUpdateState((prev) => ({ ...prev, dismissed: true }))}
+                      >
+                        Later
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
               )}
 
               <Card className="p-4 md:p-5">
