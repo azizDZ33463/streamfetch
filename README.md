@@ -84,9 +84,7 @@ brew install yt-dlp
 
 ## Build (MacOS or Linux)
 ```bash
-```
 npm run build 
-```
 ```
 
 ## Build Windows Installer + Portable
