@@ -111,21 +111,50 @@ function isUsableFfmpegBinary(candidatePath) {
   }
 }
 
-function ensureManagedYtDlpPath() {
+// Cross Platform ensureManagedYtDlpPath()
+
+function unixManagedYtDlpPath() {
+  const result = spawnSync("which", ["yt-dlp"]);
+
+  if (result.status === 0 && result.stdout) {
+    return result.stdout.toString().trim();
+  }
+
+  throw new Error(
+    "yt-dlp not found in PATH. Please install yt-dlp using your package manager or download it from https://github.com/yt-dlp/yt-dlp/releases"
+  );
+}
+
+function winManagedYtDlpPath() {
   const managedDir = path.join(app.getPath("userData"), "bin");
   const managedPath = path.join(managedDir, "yt-dlp.exe");
+
   if (fs.existsSync(managedPath)) {
     return managedPath;
   }
 
   const bundledPath = getBundledBinaryPath("yt-dlp.exe");
+
   if (!fs.existsSync(bundledPath)) {
     throw new Error("yt-dlp.exe was not found in the bin folder.");
   }
 
   fs.mkdirSync(managedDir, { recursive: true });
   fs.copyFileSync(bundledPath, managedPath);
+
   return managedPath;
+}
+
+function ensureManagedYtDlpPath() {
+  if (process.platform === "win32") {
+    return winManagedYtDlpPath();
+  }
+
+  if (process.platform === "linux" || process.platform === "darwin") {
+    return unixManagedYtDlpPath();
+  }
+
+  throw new Error(`Unsupported platform: ${process.platform}`);
 }
 
 function getFfmpegPath() {

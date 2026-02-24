@@ -67,6 +67,26 @@ npm run build:renderer
 npm start
 ```
 
+## Build and Runtime Prerequisite (macOS and Linux)
+StreamFetch relies on `yt-dlp` being available on your system at both build time and runtime. The application will not function without it.
+
+On Linux and macOS, make sure the `yt-dlp` binary exists in your `$PATH` so that it can be invoked while the app is running.
+
+Linux:
+Download the binary from the official releases or build from source. 
+Download link: <https://github.com/yt-dlp/yt-dlp/releases/download/2026.02.21/yt-dlp_linux>
+
+macOS: 
+
+```bash 
+brew install yt-dlp 
+```
+
+## Build (MacOS or Linux)
+```bash
+npm run build 
+```
+
 ## Build Windows Installer + Portable
 
 ```bash
