@@ -117,7 +117,24 @@ function unixManagedYtDlpPath() {
   const result = spawnSync("which", ["yt-dlp"]);
 
   if (result.status === 0 && result.stdout) {
-    return result.stdout.toString().trim();
+    const ytDlpPath = result.stdout.toString().trim();
+
+    try {
+      const probe = spawnSync(ytDlpPath, ["--version"], {
+        windowsHide: true,
+        timeout: 10000
+      });
+
+      if (probe.status === 0) {
+        return ytDlpPath;
+      }
+    } catch {
+      // fall through to error
+    }
+
+    throw new Error(
+      "yt-dlp was found at " + ytDlpPath + " but is not usable. Please reinstall yt-dlp or check its permissions."
+    );
   }
 
   throw new Error(
@@ -158,13 +175,40 @@ function ensureManagedYtDlpPath() {
 }
 
 function getFfmpegPath() {
-  const managed = path.join(app.getPath("userData"), "bin", "ffmpeg.exe");
+  if (process.platform === "win32") {
+    const managed = path.join(app.getPath("userData"), "bin", "ffmpeg.exe");
+    if (isUsableFfmpegBinary(managed)) {
+      return managed;
+    }
+
+    const bundledPath = getBundledBinaryPath("ffmpeg.exe");
+    return isUsableFfmpegBinary(bundledPath) ? bundledPath : "";
+  }
+
+  // macOS / Linux: check managed location, then bundled, then system PATH
+  const managed = path.join(app.getPath("userData"), "bin", "ffmpeg");
   if (isUsableFfmpegBinary(managed)) {
     return managed;
   }
 
-  const bundledPath = getBundledBinaryPath("ffmpeg.exe");
-  return isUsableFfmpegBinary(bundledPath) ? bundledPath : "";
+  const bundledPath = getBundledBinaryPath("ffmpeg");
+  if (isUsableFfmpegBinary(bundledPath)) {
+    return bundledPath;
+  }
+
+  try {
+    const result = spawnSync("which", ["ffmpeg"], { timeout: 10000 });
+    if (result.status === 0 && result.stdout) {
+      const systemPath = result.stdout.toString().trim();
+      if (isUsableFfmpegBinary(systemPath)) {
+        return systemPath;
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  return "";
 }
 
 function isValidHttpUrl(value) {
