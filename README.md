@@ -1,6 +1,6 @@
 # StreamFetch
 
-Fast Windows desktop downloader for YouTube and other platforms, built with Electron + React and powered by `yt-dlp`.
+Cross-platform desktop downloader for YouTube and other platforms, optimized primarily for Windows. Built with Electron + React and powered by `yt-dlp`. Pre-built installers are provided for Windows; macOS and Linux users can build from source.
 
 ## Screenshots
 
@@ -68,26 +68,34 @@ npm start
 ```
 
 ## Build and Runtime Prerequisite (macOS and Linux)
-StreamFetch relies on `yt-dlp` being available on your system at both build time and runtime. The application will not function without it.
 
-On Linux and macOS, make sure the `yt-dlp` binary exists in your `$PATH` so that it can be invoked while the app is running.
+There are no pre-built installers for macOS or Linux. To run StreamFetch on these platforms you must build from source yourself. Before building, install both `yt-dlp` and `ffmpeg` so they are available in your system `$PATH`:
 
-Linux:
-Download the binary from the official releases or build from source. 
-Download link: <https://github.com/yt-dlp/yt-dlp/releases/download/2026.02.21/yt-dlp_linux>
-
-macOS: 
-
-```bash 
-brew install yt-dlp 
+**Linux:**
+```bash
+# yt-dlp – download the binary from the official releases
+# https://github.com/yt-dlp/yt-dlp/releases
+# ffmpeg – install via your package manager
+sudo apt install ffmpeg        # Debian/Ubuntu
 ```
 
-## Build (MacOS or Linux)
+**macOS:**
 ```bash
-npm run build 
+brew install yt-dlp ffmpeg
+```
+
+Then clone the repository and build:
+
+```bash
+git clone https://github.com/Shripad735/streamfetch.git
+cd streamfetch
+npm install
+npm run build
 ```
 
 ## Build Windows Installer + Portable
+
+Pre-built Windows installers and portable executables are published with every release. To build them locally:
 
 ```bash
 npm run build:win
@@ -126,9 +134,11 @@ These binaries are not committed to git to keep repository size small.
 
 ## Releases
 
-Install from GitHub Releases to avoid manual setup. Each release includes:
+Install from GitHub Releases for the easiest setup. Each release includes pre-built **Windows-only** artifacts:
 - Windows installer (`Setup .exe`)
 - Portable executable (`.exe`)
+
+macOS and Linux users should follow the [Build and Runtime Prerequisite](#build-and-runtime-prerequisite-macos-and-linux) section to build from source.
 
 ## License
 
