@@ -31,6 +31,48 @@ function formatDuration(totalSeconds) {
   return `${minutes}m ${seconds}s`;
 }
 
+function parseTimeInputToSeconds(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return { seconds: null, error: "" };
+  }
+
+  if (!/^\d+(?::\d{1,2}){0,2}$/.test(normalized)) {
+    return { seconds: null, error: "Use ss, mm:ss, or hh:mm:ss." };
+  }
+
+  const parts = normalized.split(":").map((part) => Number(part));
+  if (parts.some((part) => Number.isNaN(part))) {
+    return { seconds: null, error: "Time contains invalid numbers." };
+  }
+
+  if (parts.length === 1) {
+    return { seconds: parts[0], error: "" };
+  }
+
+  if (parts.length === 2) {
+    const [minutes, seconds] = parts;
+    if (seconds >= 60) {
+      return { seconds: null, error: "Seconds must be below 60 for mm:ss." };
+    }
+    return { seconds: minutes * 60 + seconds, error: "" };
+  }
+
+  const [hours, minutes, seconds] = parts;
+  if (minutes >= 60 || seconds >= 60) {
+    return { seconds: null, error: "Minutes and seconds must be below 60 for hh:mm:ss." };
+  }
+  return { seconds: hours * 3600 + minutes * 60 + seconds, error: "" };
+}
+
+function formatSecondsToClock(totalSeconds) {
+  const safe = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 function formatFormatOption(format) {
   const res = format.resolution || (format.height ? `${format.height}p` : "Unknown");
   const fps = format.fps ? ` ${format.fps}fps` : "";
@@ -71,6 +113,9 @@ function App() {
   const [mode, setMode] = useState("video");
   const [quality, setQuality] = useState("best");
   const [selectedFormatId, setSelectedFormatId] = useState("auto");
+  const [clipEnabled, setClipEnabled] = useState(false);
+  const [clipStart, setClipStart] = useState("");
+  const [clipEnd, setClipEnd] = useState("");
   const [downloadFolder, setDownloadFolder] = useState("");
 
   const [jobs, setJobs] = useState([]);
@@ -338,6 +383,91 @@ function App() {
       })
       .slice(0, 40);
   }, [videoInfo, mode]);
+
+  const clipRangeState = useMemo(() => {
+    if (!clipEnabled) {
+      return {
+        valid: true,
+        error: "",
+        normalizedStart: "",
+        normalizedEnd: "",
+        durationSeconds: null
+      };
+    }
+
+    if (videoInfo?.isPlaylist) {
+      return {
+        valid: false,
+        error: "Clip range works only for single videos, not playlists.",
+        normalizedStart: "",
+        normalizedEnd: "",
+        durationSeconds: null
+      };
+    }
+
+    const startParsed = parseTimeInputToSeconds(clipStart);
+    const endParsed = parseTimeInputToSeconds(clipEnd);
+    if (startParsed.error) {
+      return { valid: false, error: `Start time: ${startParsed.error}`, normalizedStart: "", normalizedEnd: "", durationSeconds: null };
+    }
+    if (endParsed.error) {
+      return { valid: false, error: `End time: ${endParsed.error}`, normalizedStart: "", normalizedEnd: "", durationSeconds: null };
+    }
+    if (startParsed.seconds === null || endParsed.seconds === null) {
+      return {
+        valid: false,
+        error: "Enter both clip start and end.",
+        normalizedStart: "",
+        normalizedEnd: "",
+        durationSeconds: null
+      };
+    }
+    if (endParsed.seconds <= startParsed.seconds) {
+      return {
+        valid: false,
+        error: "End time must be greater than start time.",
+        normalizedStart: "",
+        normalizedEnd: "",
+        durationSeconds: null
+      };
+    }
+
+    const sourceDuration = Number(videoInfo?.duration || 0) || null;
+    if (sourceDuration) {
+      if (startParsed.seconds >= sourceDuration) {
+        return {
+          valid: false,
+          error: "Start time must be inside the video duration.",
+          normalizedStart: "",
+          normalizedEnd: "",
+          durationSeconds: null
+        };
+      }
+      if (endParsed.seconds > sourceDuration) {
+        return {
+          valid: false,
+          error: "End time cannot exceed the video duration.",
+          normalizedStart: "",
+          normalizedEnd: "",
+          durationSeconds: null
+        };
+      }
+    }
+
+    return {
+      valid: true,
+      error: "",
+      normalizedStart: formatSecondsToClock(startParsed.seconds),
+      normalizedEnd: formatSecondsToClock(endParsed.seconds),
+      durationSeconds: endParsed.seconds - startParsed.seconds
+    };
+  }, [clipEnabled, clipStart, clipEnd, videoInfo]);
+
+  useEffect(() => {
+    if (videoInfo?.isPlaylist && clipEnabled) {
+      setClipEnabled(false);
+    }
+  }, [videoInfo, clipEnabled]);
 
   const getBrowserLabel = useCallback((value) => {
     const found = COOKIE_BROWSER_OPTIONS.find((item) => item.value === value);
@@ -612,6 +742,10 @@ function App() {
     setErrorMessage("");
 
     try {
+      if (clipEnabled && !clipRangeState.valid) {
+        throw new Error(clipRangeState.error || "Clip range is invalid.");
+      }
+
       const result = await window.electronAPI.downloadVideo({
         url: url.trim(),
         title: videoInfo?.title || url.trim(),
@@ -623,7 +757,11 @@ function App() {
         cookieBrowser: activeCookieBrowser,
         cookiesFile: activeCookiesFile,
         allowPlaylist: Boolean(videoInfo?.isPlaylist),
-        playlistCount: videoInfo?.playlistCount || 0
+        playlistCount: videoInfo?.playlistCount || 0,
+        clipEnabled: Boolean(clipEnabled),
+        clipStart: clipRangeState.normalizedStart,
+        clipEnd: clipRangeState.normalizedEnd,
+        sourceDurationSeconds: Number(videoInfo?.duration || 0) || null
       });
       setSelectedJobId(result.jobId);
       pushToast({ type: "success", title: "Queued", message: "Download added to queue." });
@@ -792,8 +930,8 @@ function App() {
           </div>
         </header>
 
-        <main className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 xl:grid-cols-[1.28fr_1fr]">
-          <Card className="min-h-0 overflow-hidden p-4 md:p-5">
+        <main className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-4 p-4 xl:grid-cols-[1.28fr_1fr]">
+          <Card className="min-h-0 min-w-0 overflow-hidden p-4 md:p-5">
             <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pr-1 [scrollbar-color:#CBD5E1_transparent] [scrollbar-width:thin] [&>*]:shrink-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/70">
               {!hasElectron && (
                 <div className="rounded-2xl border border-app-dangerBorder bg-app-dangerBg px-4 py-3 text-sm text-app-dangerText">
@@ -893,6 +1031,70 @@ function App() {
                     ))}
                   </Input>
                 </div>
+
+                <div className="mt-4 rounded-2xl border border-app-border bg-app-panel p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-app-text">Clip Range (Optional)</p>
+                      <p className="text-xs text-app-muted">
+                        Download only a part of the video using start and end times.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={clipEnabled ? "primary" : "secondary"}
+                      disabled={Boolean(videoInfo?.isPlaylist)}
+                      onClick={() => {
+                        setClipEnabled((prev) => {
+                          const next = !prev;
+                          if (!next) {
+                            setClipStart("");
+                            setClipEnd("");
+                          }
+                          return next;
+                        });
+                      }}
+                    >
+                      {clipEnabled ? "Range On" : "Range Off"}
+                    </Button>
+                  </div>
+
+                  {videoInfo?.isPlaylist && (
+                    <p className="mt-2 text-xs text-app-muted">Clip range is available only for single videos.</p>
+                  )}
+
+                  {clipEnabled && !videoInfo?.isPlaylist && (
+                    <div className="mt-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Input
+                          label="Start Time"
+                          value={clipStart}
+                          onChange={(event) => setClipStart(event.target.value)}
+                          placeholder="00:00"
+                        />
+                        <Input
+                          label="End Time"
+                          value={clipEnd}
+                          onChange={(event) => setClipEnd(event.target.value)}
+                          placeholder={videoInfo?.duration ? formatSecondsToClock(videoInfo.duration) : "00:30"}
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-app-muted">Use `ss`, `mm:ss`, or `hh:mm:ss` (example: `90`, `1:30`, `00:01:30`).</p>
+                      {clipRangeState.valid ? (
+                        clipRangeState.normalizedStart && clipRangeState.normalizedEnd ? (
+                          <p className="mt-2 text-xs text-app-accent">
+                            Clip: {clipRangeState.normalizedStart} to {clipRangeState.normalizedEnd}
+                            {clipRangeState.durationSeconds !== null
+                              ? ` (${formatDuration(clipRangeState.durationSeconds)})`
+                              : ""}
+                          </p>
+                        ) : null
+                      ) : (
+                        <p className="mt-2 text-xs text-app-dangerText">{clipRangeState.error}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </Card>
 
               <Card className="p-4 md:p-5">
@@ -916,7 +1118,7 @@ function App() {
                 size="lg"
                 className="h-14 w-full text-base"
                 onClick={handleQueueDownload}
-                disabled={!url.trim() || !downloadFolder}
+                disabled={!url.trim() || !downloadFolder || (clipEnabled && !clipRangeState.valid)}
               >
                 Add To Queue
               </Button>
@@ -950,8 +1152,8 @@ function App() {
             </div>
           </Card>
 
-          <section className="grid min-h-0 grid-rows-[1fr_auto] gap-4 xl:grid-rows-[1fr_0.95fr]">
-            <Card className="flex min-h-0 flex-col p-4">
+          <section className="grid min-h-0 min-w-0 grid-rows-[1fr_auto] gap-4 xl:grid-rows-[1fr_0.95fr]">
+            <Card className="flex min-h-0 min-w-0 flex-col p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h3 className="font-display text-sm font-semibold text-app-text">Per-Item Progress</h3>
                 <Button size="sm" variant="ghost" onClick={clearFinished}>
@@ -975,7 +1177,7 @@ function App() {
               </div>
             </Card>
 
-            <div className="grid min-h-0 gap-4 lg:grid-cols-[1.35fr_1fr]">
+            <div className="grid min-h-0 min-w-0 gap-4 lg:grid-cols-[1.35fr_1fr]">
               <LogPanel title={selectedJob ? `Logs | ${selectedJob.title}` : "Logs"} lines={selectedJob?.logs || []} />
               <HistoryList entries={historyJobs} onClear={clearFinished} onSelect={setSelectedJobId} />
             </div>
