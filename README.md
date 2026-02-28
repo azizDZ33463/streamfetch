@@ -11,6 +11,7 @@ Cross-platform desktop downloader for YouTube and other platforms, built with El
 
 - Queue-based downloads with per-item progress and logs
 - Pause, resume, cancel, and retry controls
+- Optional clip-range downloads (start/end time)
 - Smart fallback strategy for format/download failures
 - Built-in `yt-dlp` updater
 - In-app app-update notification (checks GitHub latest release)
@@ -31,6 +32,7 @@ StreamFetch now handles restricted content in a guided flow:
 
 - Single video and playlist support
 - Advanced format picker from extracted format IDs
+- Clip-range download for single videos (`ss`, `mm:ss`, `hh:mm:ss`)
 - Playlist range controls (`start`, `end`, include, exclude)
 - Global + per-download speed limits (`500K`, `2M`, `1.5M`)
 - Download history and runtime logs
@@ -103,10 +105,25 @@ npm run build:mac
 npm run build:linux
 ```
 
+## Clip-Range Download (Time Span)
+
+You can download only a specific part of a single video:
+
+1. Fetch video metadata.
+2. In `Download Options`, enable `Clip Range`.
+3. Enter `Start Time` and `End Time` using `ss`, `mm:ss`, or `hh:mm:ss`.
+4. Queue the job.
+
+Notes:
+- Clip range is available only for single videos (not playlist jobs).
+- `ffmpeg` is required for clip extraction.
+
 ## Release Workflow
 
 - GitHub workflow runs on `v*` tags (for example `v1.2.0`).
-- Tagged releases build artifacts for Windows, macOS, and Linux.
+- Workflow validates that tag version (`vX.Y.Z`) matches `package.json` version.
+- Tagged releases build artifacts for Windows, Linux, and macOS.
+- macOS build is configured as non-blocking in CI (to avoid blocking release when mac runners are unavailable).
 - Release notes are auto-generated from commits between the previous release tag and the current tag.
 - Notes are grouped into `Features`, `Fixes`, and `Other Changes` based on commit message prefix.
 
