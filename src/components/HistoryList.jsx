@@ -3,7 +3,7 @@ import Card from "./ui/Card";
 
 function HistoryList({ entries, onClear, onSelect }) {
   return (
-    <Card as="section" className="flex min-h-0 flex-col p-4">
+    <Card as="section" className="flex min-h-0 min-w-0 flex-col p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="font-display text-sm font-semibold text-app-text">History</h3>
         <Button size="sm" variant="ghost" onClick={onClear} disabled={entries.length === 0}>

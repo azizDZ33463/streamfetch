@@ -331,6 +331,43 @@ function parseProgressLine(line) {
   };
 }
 
+function parseFfmpegProgress(line) {
+  const normalized = String(line || "");
+  const timeMatch = normalized.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/);
+  if (!timeMatch) return null;
+
+  const hours = Number(timeMatch[1] || 0);
+  const minutes = Number(timeMatch[2] || 0);
+  const seconds = Number(timeMatch[3] || 0);
+  if ([hours, minutes, seconds].some((value) => Number.isNaN(value))) {
+    return null;
+  }
+
+  const speedMatch = normalized.match(/speed=\s*([0-9]+(?:\.[0-9]+)?)x/i);
+  const speedX = speedMatch ? Number(speedMatch[1]) : null;
+
+  return {
+    processedSeconds: hours * 3600 + minutes * 60 + seconds,
+    speedX: speedX && !Number.isNaN(speedX) && speedX > 0 ? speedX : null
+  };
+}
+
+function formatEtaClock(totalSeconds) {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) {
+    return "";
+  }
+
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+
+  if (hours > 0) {
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 function sendToRenderer(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, payload);
@@ -461,6 +498,91 @@ function normalizePositiveInt(value) {
     throw new Error("Playlist range values must be positive integers.");
   }
   return num;
+}
+
+function parseTimestampToSeconds(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return null;
+
+  if (!/^\d+(?::\d{1,2}){0,2}$/.test(normalized)) {
+    throw new Error("Time must use ss, mm:ss, or hh:mm:ss.");
+  }
+
+  const parts = normalized.split(":").map((part) => Number(part));
+  if (parts.some((part) => Number.isNaN(part))) {
+    throw new Error("Time contains an invalid number.");
+  }
+
+  if (parts.length === 1) {
+    return parts[0];
+  }
+
+  if (parts.length === 2) {
+    const [minutes, seconds] = parts;
+    if (seconds >= 60) {
+      throw new Error("Seconds must be below 60 in mm:ss.");
+    }
+    return minutes * 60 + seconds;
+  }
+
+  const [hours, minutes, seconds] = parts;
+  if (minutes >= 60 || seconds >= 60) {
+    throw new Error("Minutes and seconds must be below 60 in hh:mm:ss.");
+  }
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+function formatSecondsAsClock(totalSeconds) {
+  const safe = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function normalizeClipRange({ enabled, start, end, maxDurationSeconds }) {
+  if (!enabled) {
+    return {
+      clipEnabled: false,
+      clipStart: "",
+      clipEnd: "",
+      clipStartSeconds: null,
+      clipEndSeconds: null
+    };
+  }
+
+  const startSeconds = parseTimestampToSeconds(start);
+  const endSeconds = parseTimestampToSeconds(end);
+
+  if (startSeconds === null || endSeconds === null) {
+    throw new Error("Provide both clip start and clip end.");
+  }
+
+  if (startSeconds < 0 || endSeconds < 0) {
+    throw new Error("Clip times must be zero or greater.");
+  }
+
+  if (endSeconds <= startSeconds) {
+    throw new Error("Clip end must be greater than clip start.");
+  }
+
+  const maxDuration = Number(maxDurationSeconds || 0) || null;
+  if (maxDuration) {
+    if (startSeconds >= maxDuration) {
+      throw new Error("Clip start must be inside the video duration.");
+    }
+    if (endSeconds > maxDuration) {
+      throw new Error("Clip end cannot exceed the video duration.");
+    }
+  }
+
+  return {
+    clipEnabled: true,
+    clipStart: formatSecondsAsClock(startSeconds),
+    clipEnd: formatSecondsAsClock(endSeconds),
+    clipStartSeconds: startSeconds,
+    clipEndSeconds: endSeconds
+  };
 }
 
 function normalizeIndex(rawValue, totalCount) {
@@ -666,6 +788,12 @@ function buildAudioStrategies() {
 function buildDownloadArgs({ job, strategy, ffmpegPath, effectiveRateLimit }) {
   const outputTemplate = path.join(job.outputFolder, "%(title)s.%(ext)s");
   const args = ["--newline", "--no-warnings", "--ignore-config", "--continue", "-o", outputTemplate];
+  let ffmpegLocationAdded = false;
+  const addFfmpegLocation = () => {
+    if (!ffmpegPath || ffmpegLocationAdded) return;
+    args.push("--ffmpeg-location", ffmpegPath);
+    ffmpegLocationAdded = true;
+  };
 
   if (job.cookiesFile) {
     args.push("--cookies", job.cookiesFile);
@@ -690,18 +818,24 @@ function buildDownloadArgs({ job, strategy, ffmpegPath, effectiveRateLimit }) {
     args.push("--no-playlist");
   }
 
+  if (job.clipEnabled) {
+    if (!ffmpegPath) {
+      throw new Error("Clip range download requires ffmpeg.");
+    }
+    addFfmpegLocation();
+    args.push("--download-sections", `*${job.clipStart}-${job.clipEnd}`);
+  }
+
   if (job.mode === "audio") {
     if (strategy.extractMp3) {
-      if (ffmpegPath) {
-        args.push("--ffmpeg-location", ffmpegPath);
-      }
+      addFfmpegLocation();
       args.push("-f", strategy.format, "-x", "--audio-format", "mp3", "--audio-quality", "0");
     } else {
       args.push("-f", strategy.format);
     }
   } else {
-    if (strategy.useFfmpeg && ffmpegPath) {
-      args.push("--ffmpeg-location", ffmpegPath);
+    if (strategy.useFfmpeg) {
+      addFfmpegLocation();
     }
     args.push("-f", strategy.format);
     if (strategy.mergeMp4 && ffmpegPath) {
@@ -806,11 +940,42 @@ function startJob(job) {
       const level = line.startsWith("ERROR") ? "error" : line.includes("WARNING") ? "warn" : "info";
       appendJobLog(job, line, level);
 
+      if (job.clipEnabled && job.clipStartSeconds !== null && job.clipEndSeconds !== null) {
+        const clipDuration = Math.max(1, Number(job.clipEndSeconds) - Number(job.clipStartSeconds));
+        const ffmpegProgress = parseFfmpegProgress(line);
+        if (ffmpegProgress) {
+          const ffmpegPercent = Math.min(99, Math.max(0, (ffmpegProgress.processedSeconds / clipDuration) * 100));
+          if (ffmpegPercent > Number(job.progress || 0)) {
+            const remainingSeconds = Math.max(0, clipDuration - ffmpegProgress.processedSeconds);
+            const derivedEta =
+              ffmpegProgress.speedX && ffmpegProgress.speedX > 0
+                ? formatEtaClock(remainingSeconds / ffmpegProgress.speedX)
+                : "Processing";
+            job.progress = ffmpegPercent;
+            job.speed = ffmpegProgress.speedX ? `${ffmpegProgress.speedX.toFixed(2)}x` : "";
+            job.eta = derivedEta || "Processing";
+            sendToRenderer("video:download-progress", {
+              jobId: job.id,
+              percent: job.progress,
+              speed: job.speed,
+              eta: job.eta
+            });
+          }
+        }
+      }
+
       const progress = parseProgressLine(line);
       if (!progress) return;
-      job.progress = Number(progress.percent || 0);
+
+      let percent = Number(progress.percent || 0);
+      if (job.clipEnabled && percent >= 100) {
+        // For clipped downloads, keep <100 until yt-dlp process actually exits successfully.
+        percent = 99;
+      }
+
+      job.progress = percent;
       job.speed = progress.speed || "";
-      job.eta = progress.eta || "";
+      job.eta = progress.eta || (job.clipEnabled && percent >= 99 ? "Processing" : "");
       sendToRenderer("video:download-progress", {
         jobId: job.id,
         percent: job.progress,
@@ -1336,13 +1501,29 @@ ipcMain.handle("video:start-download", async (_event, payload) => {
   const allowPlaylist = Boolean(payload?.allowPlaylist);
   const perDownloadSpeedLimit = normalizeRateLimit(payload?.perDownloadSpeedLimit || "");
   const selectedFormatId = String(payload?.selectedFormatId || "auto").trim() || "auto";
+  const clipEnabled = Boolean(payload?.clipEnabled);
+  const sourceDurationSeconds = Number(payload?.sourceDurationSeconds || 0) || null;
   const cookiesFile = normalizeCookiesFile(payload?.cookiesFile);
   const cookieBrowser = cookiesFile ? "" : normalizeCookieBrowser(payload?.cookieBrowser);
+
+  if (clipEnabled && allowPlaylist) {
+    throw new Error("Clip range is available only for single videos.");
+  }
 
   const playlistStart = allowPlaylist ? normalizePositiveInt(payload?.playlistStart) : null;
   const playlistEnd = allowPlaylist ? normalizePositiveInt(payload?.playlistEnd) : null;
   if (playlistStart && playlistEnd && playlistEnd < playlistStart) {
     throw new Error("Playlist end must be greater than or equal to playlist start.");
+  }
+
+  const clipRange = normalizeClipRange({
+    enabled: clipEnabled,
+    start: payload?.clipStart,
+    end: payload?.clipEnd,
+    maxDurationSeconds: sourceDurationSeconds
+  });
+  if (clipRange.clipEnabled && !getFfmpegPath()) {
+    throw new Error("Clip range download requires ffmpeg. Use a full download or make ffmpeg available.");
   }
 
   const job = {
@@ -1362,6 +1543,11 @@ ipcMain.handle("video:start-download", async (_event, payload) => {
     playlistInclude: String(payload?.playlistInclude || "").trim(),
     playlistExclude: String(payload?.playlistExclude || "").trim(),
     playlistCount: Number(payload?.playlistCount || 0) || null,
+    clipEnabled: clipRange.clipEnabled,
+    clipStart: clipRange.clipStart,
+    clipEnd: clipRange.clipEnd,
+    clipStartSeconds: clipRange.clipStartSeconds,
+    clipEndSeconds: clipRange.clipEndSeconds,
     perDownloadSpeedLimit,
     status: JOB_STATUS.QUEUED,
     progress: 0,
@@ -1375,6 +1561,9 @@ ipcMain.handle("video:start-download", async (_event, payload) => {
   };
 
   appendJobLog(job, "Added to queue.");
+  if (clipRange.clipEnabled) {
+    appendJobLog(job, `Clip range: ${clipRange.clipStart} to ${clipRange.clipEnd}.`);
+  }
   jobsById.set(job.id, job);
   queuedJobIds.push(job.id);
 

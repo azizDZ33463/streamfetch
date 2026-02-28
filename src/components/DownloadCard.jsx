@@ -28,6 +28,8 @@ function statusLabel(status) {
 function DownloadCard({ job, selected, onSelect, onPause, onResume, onCancel }) {
   const progress = Math.max(0, Math.min(100, Number(job.progress || 0)));
   const status = job.status || "queued";
+  const clipSummary =
+    job.clipEnabled && job.clipStart && job.clipEnd ? ` | Clip ${job.clipStart} to ${job.clipEnd}` : "";
   const canPause = status === "downloading" || status === "queued";
   const canResume = status === "paused" || status === "failed" || status === "canceled";
   const canCancel = status === "downloading" || status === "queued" || status === "paused" || status === "retrying";
@@ -56,7 +58,10 @@ function DownloadCard({ job, selected, onSelect, onPause, onResume, onCancel }) 
         <Badge variant={statusVariant}>{statusLabel(status)}</Badge>
       </header>
 
-      <p className="mb-3 text-xs text-app-muted">{job.mode === "audio" ? "Audio MP3" : `Video ${job.quality || "best"}`}</p>
+      <p className="mb-3 text-xs text-app-muted">
+        {job.mode === "audio" ? "Audio MP3" : `Video ${job.quality || "best"}`}
+        {clipSummary}
+      </p>
 
       <div className="mb-3 flex flex-wrap gap-2">
         <Badge variant="info">{progress.toFixed(1)}%</Badge>
